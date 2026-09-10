@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Công Cụ Nhân Bản Dòng - Bản quyền NK</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #f8fafc; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 15px; }
+        
+        .container { width: 100%; max-width: 420px; background: #1e293b; border-radius: 16px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #334155; }
+        
+        .header { text-align: center; margin-bottom: 15px; }
+        .header h2 { color: #38bdf8; font-size: 20px; text-transform: uppercase; letter-spacing: 1px; }
+        .copyright-badge { display: inline-block; background: #3b82f6; color: #fff; font-size: 11px; font-weight: bold; padding: 2px 10px; border-radius: 12px; margin-top: 5px; }
+
+        /* Device ID Info */
+        .device-info { font-size: 10px; color: #64748b; text-align: center; margin-top: 4px; font-family: monospace; }
+
+        /* Khung hiển thị Xu */
+        .coin-box { background: #0f172a; border: 1px solid #eab308; border-radius: 10px; padding: 10px; text-align: center; margin-bottom: 15px; }
+        .coin-title { font-size: 12px; color: #94a3b8; }
+        .coin-val { font-size: 22px; font-weight: bold; color: #facc15; }
+
+        /* Nhiệm vụ cày xu */
+        .task-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+        .btn-task { padding: 8px; border: none; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; color: #fff; background: #334155; border: 1px solid #475569; }
+        .btn-task:active { transform: scale(0.98); }
+
+        /* Nút Tăng Tốc VIP */
+        .btn-boost { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ef4444; background: linear-gradient(135deg, #991b1b, #dc2626); color: #fff; font-weight: bold; font-size: 12px; border-radius: 8px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+        .btn-boost:active { transform: scale(0.98); }
+
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 4px; font-weight: 600; }
+        .form-group input, .form-group textarea { width: 100%; padding: 8px 10px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: #fff; font-size: 13px; outline: none; }
+        .form-group textarea { height: 60px; resize: vertical; }
+
+        .btn-group { display: flex; gap: 8px; margin-bottom: 12px; }
+        .btn { flex: 1; padding: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 12px; }
+        .btn-generate { background: linear-gradient(135deg, #0284c7, #2563eb); color: #fff; }
+        .btn-copy { background: linear-gradient(135deg, #16a34a, #15803d); color: #fff; }
+        .btn-clear { background: linear-gradient(135deg, #dc2626, #b91c1c); color: #fff; }
+
+        .output-box textarea { width: 100%; height: 160px; background: #090d16; border: 1px solid #334155; border-radius: 8px; padding: 8px; color: #4ade80; font-family: monospace; font-size: 12px; outline: none; white-space: pre; }
+        .footer-credit { text-align: center; font-size: 10px; color: #64748b; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h2>Công Cụ Nhân Bản</h2>
+        <div class="copyright-badge">Bản quyền NK</div>
+        <div class="device-info" id="device-id-display">Device ID: Loading...</div>
+    </div>
+
+    <!-- Số Xu -->
+    <div class="coin-box">
+        <div class="coin-title">Số Xu Hiện Có (Phí: 20 xu/lần)</div>
+        <div class="coin-val" id="user-coins">0 XU</div>
+    </div>
+
+    <!-- Nhiệm Vụ Cày Xu -->
+    <div class="task-grid">
+        <button class="btn-task" onclick="dailyCheckIn()">📅 Đăng nhập (+10 xu)</button>
+        <button class="btn-task" onclick="bypassLink()" style="border-color: #eab308; color: #facc15;">🔗 Vượt link (+40 xu)</button>
+    </div>
+
+    <!-- Nút Mua Tăng Tốc -->
+    <button class="btn-boost" onclick="buyBoost()">⚡ TĂNG TỐC x99999999 (Phí: 5 Xu/lần)</button>
+
+    <!-- Nhập Ký Tự -->
+    <div class="form-group">
+        <label for="input-text">Nội dung / Ký tự cần nhân bản:</label>
+        <textarea id="input-text" placeholder="Nhập từ hoặc ký tự vào đây..."></textarea>
+    </div>
+
+    <!-- Nhập Số Dòng -->
+    <div class="form-group">
+        <label for="input-lines">Số dòng muốn nhân bản (Tối đa 1,367):</label>
+        <input type="number" id="input-lines" oninput="updateTimeEstimate()" placeholder="Ví dụ: 500" min="1" max="1367">
+    </div>
+
+    <!-- Nút Thao Tác -->
+    <div class="btn-group">
+        <button class="btn btn-generate" id="btn-gen" onclick="generateText()">Tạo Dòng (20 xu)</button>
+        <button class="btn btn-copy" onclick="copyResult()">Sao Chép</button>
+        <button class="btn btn-clear" onclick="clearAll()">Xóa Hết 🗑️</button>
+    </div>
+
+    <!-- Kết Quả -->
+    <div class="output-box">
+        <textarea id="output-text" readonly placeholder="Kết quả hiển thị tại đây..."></textarea>
+    </div>
+
+    <div class="footer-credit">Được phát triển bởi NK • Max 1,367 dòng</div>
+</div>
+
+<script>
+    function getDeviceId() {
+        let deviceId = localStorage.getItem('nk_device_id');
+        if (!deviceId) {
+            deviceId = 'NK-' + Math.random().toString(36).substring(2, 9).toUpperCase();
+            localStorage.setItem('nk_device_id', deviceId);
+        }
+        return deviceId;
+    }
+
+    const deviceId = getDeviceId();
+    document.getElementById('device-id-display').innerText = `Device ID: ${deviceId}`;
+
+    let coins = parseInt(localStorage.getItem('nk_coins')) || 0;
+    let claimedBonus = localStorage.getItem('nk_bonus_claimed') === 'true';
+    let lastCheckIn = localStorage.getItem('nk_last_checkin') || '';
+    let isBoosted = false;
+
+    function saveData() {
+        localStorage.setItem('nk_coins', coins);
+        localStorage.setItem('nk_bonus_claimed', claimedBonus);
+        localStorage.setItem('nk_last_checkin', lastCheckIn);
+    }
+
+    function updateUI() {
+        document.getElementById('user-coins').innerText = `${coins.toLocaleString('vi-VN')} XU`;
+        checkCoinBonus();
+        saveData();
+        updateTimeEstimate();
+    }
+
+    // Tự động tính và hiển thị số giây lên nút Tạo Dòng
+    function updateTimeEstimate() {
+        const btnGen = document.getElementById('btn-gen');
+        if (isGenerating) return;
+
+        let linesCount = parseInt(document.getElementById('input-lines').value);
+
+        if (isNaN(linesCount) || linesCount <= 0) {
+            btnGen.innerText = "Tạo Dòng (20 xu)";
+            return;
+        }
+
+        if (linesCount > 1367) linesCount = 1367;
+
+        if (isBoosted) {
+            btnGen.innerText = `Tạo Dòng (20 xu • 0.001s⚡)`;
+        } else {
+            const sec = (linesCount * 0.1).toFixed(1);
+            btnGen.innerText = `Tạo Dòng (20 xu • ${sec}s)`;
+        }
+    }
+
+    function checkCoinBonus() {
+        if (coins >= 50 && !claimedBonus) {
+            coins += 20;
+            claimedBonus = true;
+            alert("🎉 Đạt mốc 50 xu! Thưởng thêm 20 XU!");
+            updateUI();
+        }
+    }
+
+    function dailyCheckIn() {
+        const today = new Date().toDateString();
+        if (lastCheckIn !== today) {
+            coins += 10;
+            lastCheckIn = today;
+            updateUI();
+            alert("Đã nhận 10 xu đăng nhập!");
+        } else {
+            alert("Hôm nay nhận rồi, quay lại sau đi tml!");
+        }
+    }
+
+    function bypassLink() {
+        alert("Đang chuyển hướng vượt link... (Đợi 2 giây)");
+        setTimeout(() => {
+            coins += 40;
+            updateUI();
+            alert("Vượt link thành công! +40 xu");
+        }, 2000);
+    }
+
+    function buyBoost() {
+        if (isBoosted) {
+            alert("Đã kích hoạt Tăng Tốc x99999999 rồi!");
+            return;
+        }
+
+        if (coins < 5) {
+            alert("Đéo đủ 5 xu để mua Tăng Tốc! Cày thêm xu đi mày.");
+            return;
+        }
+
+        coins -= 5;
+        isBoosted = true;
+        updateUI();
+        alert("⚡ Kích hoạt TĂNG TỐC x99999999 thành công (-5 xu)!");
+    }
+
+    let isGenerating = false;
+
+    function generateText() {
+        if (isGenerating) return;
+
+        const text = document.getElementById('input-text').value;
+        let linesCount = parseInt(document.getElementById('input-lines').value);
+        const outputArea = document.getElementById('output-text');
+        const btnGen = document.getElementById('btn-gen');
+
+        if (coins < 20) {
+            alert("Đéo đủ 20 xu! Đi cày xu đi mày.");
+            return;
+        }
+
+        if (!text) {
+            alert("Nhập chữ vào đã chứ tml!");
+            return;
+        }
+
+        if (isNaN(linesCount) || linesCount <= 0) {
+            alert("Nhập số dòng đàng hoàng vào!");
+            return;
+        }
+
+        if (linesCount > 1367) {
+            alert("Tối đa 1,367 dòng thôi, ép quá nổ máy đấy!");
+            linesCount = 1367;
+            document.getElementById('input-lines').value = 1367;
+        }
+
+        coins -= 20;
+        updateUI();
+
+        outputArea.value = "";
+
+        if (isBoosted) {
+            let result = [];
+            for (let i = 0; i < linesCount; i++) {
+                result.push(text);
+            }
+            outputArea.value = result.join('\n');
+            isBoosted = false;
+            updateTimeEstimate();
+            alert(`⚡ TĂNG TỐC x99999999! Đã xả ${linesCount} dòng trong 0.001s!`);
+            return;
+        }
+
+        isGenerating = true;
+        btnGen.style.opacity = "0.5";
+
+        let currentLine = 0;
+        const totalTime = (linesCount * 0.1).toFixed(1);
+
+        const timer = setInterval(() => {
+            currentLine++;
+            outputArea.value += text + (currentLine < linesCount ? '\n' : '');
+            outputArea.scrollTop = outputArea.scrollHeight;
+
+            const remainSec = ((linesCount - currentLine) * 0.1).toFixed(1);
+            btnGen.innerText = `Đang chạy... (${remainSec}s)`;
+
+            if (currentLine >= linesCount) {
+                clearInterval(timer);
+                isGenerating = false;
+                btnGen.style.opacity = "1";
+                updateTimeEstimate();
+                alert(`Hoàn thành ${linesCount} dòng trong ${totalTime}s!`);
+            }
+        }, 100);
+    }
+
+    function copyResult() {
+        const outputArea = document.getElementById('output-text');
+        if (!outputArea.value) {
+            alert("Có cái đéo gì đâu mà copy!");
+            return;
+        }
+
+        outputArea.select();
+        outputArea.setSelectionRange(0, 99999);
+
+        navigator.clipboard.writeText(outputArea.value).then(() => {
+            alert("Đã sao chép thành công!");
+        }).catch(() => {
+            document.execCommand('copy');
+            alert("Đã sao chép thành công!");
+        });
+    }
+
+    function clearAll() {
+        const outputArea = document.getElementById('output-text');
+        if (!outputArea.value) {
+            alert("Khung đang trống, xóa cái đéo gì?");
+            return;
+        }
+
+        outputArea.value = "";
+        alert("⚠️ Đã xóa toàn bộ kết quả! Không hoàn lại 20 xu đã sử dụng!");
+    }
+
+    updateUI();
+</script>
+
+</body>
+</html>
