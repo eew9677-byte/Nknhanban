@@ -28,7 +28,7 @@
         .btn-task:active { transform: scale(0.98); }
 
         /* Nút Tăng Tốc VIP */
-        .btn-boost { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ef4444; background: linear-gradient(135deg, #991b1b, #dc2626); color: #fff; font-weight: bold; font-size: 12px; border-radius: 8px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+        .btn-boost { width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ef4444; background: linear-gradient(135deg, #991b1b, #dc2626); color: #fff; font-weight: bold; font-size: 12px; border-radius: 8px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
         .btn-boost:active { transform: scale(0.98); }
 
         .form-group { margin-bottom: 12px; }
@@ -36,9 +36,10 @@
         .form-group input, .form-group textarea { width: 100%; padding: 8px 10px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: #fff; font-size: 13px; outline: none; }
         .form-group textarea { height: 60px; resize: vertical; }
 
-        .btn-group { display: flex; gap: 8px; margin-bottom: 12px; }
+        .btn-group { display: flex; gap: 8px; margin-bottom: 8px; }
         .btn { flex: 1; padding: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 12px; }
         .btn-generate { background: linear-gradient(135deg, #0284c7, #2563eb); color: #fff; }
+        .btn-vip { background: linear-gradient(135deg, #8b5cf6, #6d28d9); color: #fff; }
         .btn-copy { background: linear-gradient(135deg, #16a34a, #15803d); color: #fff; }
         .btn-clear { background: linear-gradient(135deg, #dc2626, #b91c1c); color: #fff; }
 
@@ -57,7 +58,7 @@
 
     <!-- Số Xu -->
     <div class="coin-box">
-        <div class="coin-title">Số Xu Hiện Có (Phí: 20 xu/lần)</div>
+        <div class="coin-title">Số Xu Hiện Có</div>
         <div class="coin-val" id="user-coins">0 XU</div>
     </div>
 
@@ -65,6 +66,15 @@
     <div class="task-grid">
         <button class="btn-task" onclick="dailyCheckIn()">📅 Đăng nhập (+10 xu)</button>
         <button class="btn-task" onclick="bypassLink()" style="border-color: #eab308; color: #facc15;">🔗 Vượt link (+40 xu)</button>
+    </div>
+
+    <!-- Nhập Code VIP Nhận Xu -->
+    <div class="form-group">
+        <label for="vip-code-input">🎁 Nhập Code VIP Quà Tặng:</label>
+        <div style="display: flex; gap: 6px;">
+            <input type="text" id="vip-code-input" placeholder="Nhập mã VIP tại đây..." style="text-transform: uppercase;">
+            <button class="btn btn-vip" style="flex: 0 0 90px;" onclick="redeemVipCode()">Nhập Code</button>
+        </div>
     </div>
 
     <!-- Nút Mua Tăng Tốc -->
@@ -82,9 +92,14 @@
         <input type="number" id="input-lines" oninput="updateTimeEstimate()" placeholder="Ví dụ: 500" min="1" max="1367">
     </div>
 
-    <!-- Nút Thao Tác -->
+    <!-- Nút Tạo Dòng Thường & VIP -->
     <div class="btn-group">
-        <button class="btn btn-generate" id="btn-gen" onclick="generateText()">Tạo Dòng (20 xu)</button>
+        <button class="btn btn-generate" id="btn-gen" onclick="generateText(false)">Tạo Thường (20 xu)</button>
+        <button class="btn btn-vip" id="btn-gen-vip" onclick="generateText(true)">Tạo VIP +1,2,3 (50 xu)</button>
+    </div>
+
+    <!-- Nút Thao Tác Khác -->
+    <div class="btn-group">
         <button class="btn btn-copy" onclick="copyResult()">Sao Chép</button>
         <button class="btn btn-clear" onclick="clearAll()">Xóa Hết 🗑️</button>
     </div>
@@ -113,12 +128,21 @@
     let coins = parseInt(localStorage.getItem('nk_coins')) || 0;
     let claimedBonus = localStorage.getItem('nk_bonus_claimed') === 'true';
     let lastCheckIn = localStorage.getItem('nk_last_checkin') || '';
+    let usedCodes = JSON.parse(localStorage.getItem('nk_used_codes')) || [];
     let isBoosted = false;
+
+    // DANH SÁCH MÃ CODE VIP (ĐÃ MÃ HÓA BASE64 CHỐNG SOI SOURCE TRÊN GITHUB)
+    const ENCRYPTED_VIP_CODES = {
+        'TktZVEIxVFNVQg==': 200,   // NKYTB1TSUB = 200 XU
+        'S0hBTkdMQUtIQU5H': 40,    // KHANGLAKHANG = 40 XU
+        'REFOR0tZWVRC': 800        // DANGKYYTB = 800 XU
+    };
 
     function saveData() {
         localStorage.setItem('nk_coins', coins);
         localStorage.setItem('nk_bonus_claimed', claimedBonus);
         localStorage.setItem('nk_last_checkin', lastCheckIn);
+        localStorage.setItem('nk_used_codes', JSON.stringify(usedCodes));
     }
 
     function updateUI() {
@@ -128,25 +152,88 @@
         updateTimeEstimate();
     }
 
-    // Tự động tính và hiển thị số giây lên nút Tạo Dòng
+    // KIỂM TRA THƯỞNG VƯỢT LINK LINK4M KHI QUAY LẠI TRANG
+    function checkLinkReward() {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('done') === 'bypass') {
+            const lastRewardTime = localStorage.getItem('nk_last_bypass_time');
+            const now = new Date().getTime();
+            
+            // Chống spam F5 trùng (cách nhau ít nhất 5 giây)
+            if (!lastRewardTime || (now - parseInt(lastRewardTime)) > 5000) {
+                coins += 40;
+                localStorage.setItem('nk_last_bypass_time', now);
+                updateUI();
+                alert("🎉 Vượt link Link4m thành công! Mày nhận được +40 XU!");
+            }
+            
+            // Xóa tham số ?done=bypass trên thanh địa chỉ cho đẹp
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }
+
+    // XỬ LÝ CHUYỂN HƯỚNG VƯỢT LINK LINK4M
+    function bypassLink() {
+        alert("Chuyển hướng đến Link4m để vượt link nhận 40 xu...");
+        window.location.href = "https://link4m.org/hlVqUUJk";
+    }
+
+    // XỬ LÝ NHẬP CODE VIP
+    function redeemVipCode() {
+        const inputEl = document.getElementById('vip-code-input');
+        const rawCode = inputEl.value.trim().toUpperCase();
+
+        if (!rawCode) {
+            alert("Chưa nhập code kìa tml!");
+            return;
+        }
+
+        let encoded = "";
+        try {
+            encoded = btoa(rawCode);
+        } catch(e) {
+            encoded = rawCode;
+        }
+
+        if (usedCodes.includes(encoded) || usedCodes.includes(rawCode)) {
+            alert("Code này mày đã nhập rồi, đéo dùng lại được đâu!");
+            return;
+        }
+
+        if (ENCRYPTED_VIP_CODES.hasOwnProperty(encoded)) {
+            const bonusCoins = ENCRYPTED_VIP_CODES[encoded];
+            coins += bonusCoins;
+            usedCodes.push(encoded);
+            updateUI();
+            inputEl.value = "";
+            alert(`🎉 Nhập code VIP thành công! Nhận ngay +${bonusCoins} XU!`);
+        } else {
+            alert("❌ Code đéo tồn tại hoặc nhập sai rồi con gà!");
+        }
+    }
+
     function updateTimeEstimate() {
         const btnGen = document.getElementById('btn-gen');
+        const btnVip = document.getElementById('btn-gen-vip');
         if (isGenerating) return;
 
         let linesCount = parseInt(document.getElementById('input-lines').value);
 
         if (isNaN(linesCount) || linesCount <= 0) {
-            btnGen.innerText = "Tạo Dòng (20 xu)";
+            if (btnGen) btnGen.innerText = "Tạo Thường (20 xu)";
+            if (btnVip) btnVip.innerText = "Tạo VIP +1,2,3 (50 xu)";
             return;
         }
 
         if (linesCount > 1367) linesCount = 1367;
 
         if (isBoosted) {
-            btnGen.innerText = `Tạo Dòng (20 xu • 0.001s⚡)`;
+            if (btnGen) btnGen.innerText = `Tạo Thường (20 xu • 0.001s⚡)`;
+            if (btnVip) btnVip.innerText = `Tạo VIP +1,2,3 (50 xu • 0.001s⚡)`;
         } else {
             const sec = (linesCount * 0.1).toFixed(1);
-            btnGen.innerText = `Tạo Dòng (20 xu • ${sec}s)`;
+            if (btnGen) btnGen.innerText = `Tạo Thường (20 xu • ${sec}s)`;
+            if (btnVip) btnVip.innerText = `Tạo VIP +1,2,3 (50 xu • ${sec}s)`;
         }
     }
 
@@ -171,15 +258,6 @@
         }
     }
 
-    function bypassLink() {
-        alert("Đang chuyển hướng vượt link... (Đợi 2 giây)");
-        setTimeout(() => {
-            coins += 40;
-            updateUI();
-            alert("Vượt link thành công! +40 xu");
-        }, 2000);
-    }
-
     function buyBoost() {
         if (isBoosted) {
             alert("Đã kích hoạt Tăng Tốc x99999999 rồi!");
@@ -199,16 +277,19 @@
 
     let isGenerating = false;
 
-    function generateText() {
+    function generateText(isVip = false) {
         if (isGenerating) return;
 
         const text = document.getElementById('input-text').value;
         let linesCount = parseInt(document.getElementById('input-lines').value);
         const outputArea = document.getElementById('output-text');
         const btnGen = document.getElementById('btn-gen');
+        const btnVip = document.getElementById('btn-gen-vip');
 
-        if (coins < 20) {
-            alert("Đéo đủ 20 xu! Đi cày xu đi mày.");
+        const requiredCoins = isVip ? 50 : 20;
+
+        if (coins < requiredCoins) {
+            alert(`Đéo đủ ${requiredCoins} xu! Đi cày xu hoặc nhập Code VIP đi mày.`);
             return;
         }
 
@@ -228,43 +309,48 @@
             document.getElementById('input-lines').value = 1367;
         }
 
-        coins -= 20;
+        coins -= requiredCoins;
         updateUI();
 
         outputArea.value = "";
 
         if (isBoosted) {
             let result = [];
-            for (let i = 0; i < linesCount; i++) {
-                result.push(text);
+            for (let i = 1; i <= linesCount; i++) {
+                const lineContent = isVip ? `${text} ${i}` : text;
+                result.push(lineContent);
             }
             outputArea.value = result.join('\n');
             isBoosted = false;
             updateTimeEstimate();
-            alert(`⚡ TĂNG TỐC x99999999! Đã xả ${linesCount} dòng trong 0.001s!`);
+            alert(`⚡ TĂNG TỐC x99999999! Đã xả ${linesCount} dòng ${isVip ? 'VIP ' : ''}trong 0.001s!`);
             return;
         }
 
         isGenerating = true;
         btnGen.style.opacity = "0.5";
+        btnVip.style.opacity = "0.5";
 
         let currentLine = 0;
         const totalTime = (linesCount * 0.1).toFixed(1);
 
         const timer = setInterval(() => {
             currentLine++;
-            outputArea.value += text + (currentLine < linesCount ? '\n' : '');
+            const lineContent = isVip ? `${text} ${currentLine}` : text;
+            outputArea.value += lineContent + (currentLine < linesCount ? '\n' : '');
             outputArea.scrollTop = outputArea.scrollHeight;
 
             const remainSec = ((linesCount - currentLine) * 0.1).toFixed(1);
-            btnGen.innerText = `Đang chạy... (${remainSec}s)`;
+            const activeBtn = isVip ? btnVip : btnGen;
+            activeBtn.innerText = `Đang chạy... (${remainSec}s)`;
 
             if (currentLine >= linesCount) {
                 clearInterval(timer);
                 isGenerating = false;
                 btnGen.style.opacity = "1";
+                btnVip.style.opacity = "1";
                 updateTimeEstimate();
-                alert(`Hoàn thành ${linesCount} dòng trong ${totalTime}s!`);
+                alert(`Hoàn thành ${linesCount} dòng ${isVip ? 'VIP ' : ''}trong ${totalTime}s!`);
             }
         }, 100);
     }
@@ -295,9 +381,11 @@
         }
 
         outputArea.value = "";
-        alert("⚠️ Đã xóa toàn bộ kết quả! Không hoàn lại 20 xu đã sử dụng!");
+        alert("⚠️ Đã xóa toàn bộ kết quả!");
     }
 
+    // KHỞI CHẠY TẢI TRANG
+    checkLinkReward();
     updateUI();
 </script>
 
